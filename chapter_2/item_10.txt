@@ -1,42 +1,50 @@
 // Item 10
 
-// C early binding
-#import <stdio.h>
-
-void printHello() {
-   printf("Hello, world!\n");
+- (void)askUserAQuestion {
+    UIAlertView *alert = [[UIAlertView alloc]
+                          initWithTitle:@"Question" message:@"What do you want to do?"
+                          delegate:self
+                          cancelButtonTitle:@"Cancel"
+                          otherButtonTitles:@"Continue",
+                          nil];
+    [alert show];
 }
-void printGoodbye() {
-    printf("Goodbye, world!\n");
-} 
 
-void doTheThing(int type) {
-    if (type == 0) {
-        printHello();
+- (void)alertView:(UIAlertView *)alertView clickedButtonAtIndex:(NSInteger)buttonIndex {
+    if (buttonIndex == 0) {
+        [self doCancel];
     } else {
-        printGoodbye();
+        [self doContinue];
     }
-    return 0;
 }
 
+#import <objc/runtime.h>
 
-// C late binding
-#import <stdio.h>
+static void *EOCMyAlertViewKey = "EOCMyAlertViewKey";
 
-void printHello() {
-   printf("Hello, world!\n");
+- (void)askUserAQuestion {
+    UIAlertView *alert = [[UIAlertView alloc]
+                          initWithTitle:@"Question" message:@"What do you want to do?"
+                          delegate:self
+                          cancelButtonTitle:@"Cancel"
+                          otherButtonTitles:@"Continue",
+                          nil];
+    void (^block)(NSInteger) = ^(NSInteger buttonIndex){
+        if (buttonIndex == 0) {
+            [self doCancel];
+        } else {
+            [self doContinue];
+        }
+    };
+    
+    objc_setAssociatedObject(alert,
+                             EOCMyAlertViewKey,
+                             block,
+                             OBJC_ASSOCIATION_COPY);
+    [alert show];
 }
-void printGoodbye() {
-    printf("Goodbye, world!\n");
-} 
 
-void doTheThing(int type) {
-    void (*fnc)();
-    if (type == 0) {
-        fnc = printHello;
-    } else {
-        fnc = printGoodbye;
-    }
-    fnc();
-    return 0;
+- (void)alertView:(UIAlertView*)alertView clickedButtonAtIndex:(NSInteger)buttonIndex {
+    void (^block)(NSInteger) = objc_getAssociatedObject(alertView, EOCMyAlertViewKey);
+    block(buttonIndex);
 }
