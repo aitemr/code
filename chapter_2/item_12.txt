@@ -1,44 +1,107 @@
-// Item 12
+// Item 11
 
-// Exchanging methods
-Method originalMethod = 
-    class_getInstanceMethod([NSString class], 
-                            @selector(lowercaseString));
-Method swappedMethod = 
-    class_getInstanceMethod([NSString class], 
-                            @selector(uppercaseString));
-method_exchangeImplementations(originalMethod, swappedMethod);
+// `resolveInstanceMethod' example
+id autoDictionaryGetter(id self, SEL _cmd);
+void autoDictionarySetter(id self, SEL _cmd, id value);
 
++ (BOOL)resolveInstanceMethod:(SEL)selector {
+    NSString *selectorString = NSStringFromSelector(selector);
+    if (/* selector is from a @dynamic property */) {
+        if ([selectorString hasPrefix:@"set"]) {
+            class_addMethod(self, selector, (IMP)autoDictionarySetter, "v@:@");
+        } else {
+            class_addMethod(self, selector, (IMP)autoDictionaryGetter, "@@:");
+        }
+        return YES;
+    }
 
-// Using the method exchanging of NSString
-NSString *string = @"ThIs iS tHe StRiNg";
-
-NSString *lowercaseString = [string lowercaseString];
-NSLog(@"lowercaseString = %@", lowercaseString);
-// Output: lowercaseString = THIS IS THE STRING
-
-NSString *uppercaseString = [string uppercaseString];
-NSLog(@"uppercaseString = %@", uppercaseString);
-// Output: uppercaseString = this is the string
-
-
-// Using a category and then swizzling methods
-@interface NSString (MyAdditions)
-- (NSString*)myLowercaseString;
-@end
-
-@implementation NSString (MyAdditions)
-- (NSString*)myLowercaseString {
-    NSString *lowercase = [self myLowercaseString];
-    NSLog(@"Lowercasing string: %@ => %@", self, lowercase);
-    return lowercase;
+    return [super resolveInstanceMethod:selector];
 }
+
+
+// Full "EOCAutoDictionary" example
+#import <Foundation/Foundation.h>
+
+@interface EOCAutoDictionary : NSObject
+@property (nonatomic, strong) NSString *string;
+@property (nonatomic, strong) NSNumber *number;
+@property (nonatomic, strong) NSDate *date;
+@property (nonatomic, strong) id opaqueObject;
 @end
 
-Method originalMethod = class_getInstanceMethod([NSString class], @selector(lowercaseString));
-Method swappedMethod = class_getInstanceMethod([NSString class], @selector(myLowercaseString));
-method_exchangeImplementations(originalMethod, swappedMethod);
+#import "EOCAutoDictionary.h"
+#import <objc/runtime.h>
 
-NSString *string = @"ThIs iS tHe StRiNg";
-NSString *lowercaseString = [string lowercaseString];
-// Output: Lowercasing string: ThIs iS tHe StRiNg => this is the string
+@interface EOCAutoDictionary ()
+@property (nonatomic, strong) NSMutableDictionary *backingStore;
+@end
+
+@implementation EOCAutoDictionary
+@dynamic string, number, date, opaqueObject;
+
+- (id)init {
+    if ((self = [super init])) {
+        _backingStore = [NSMutableDictionary new];
+    }
+    return self;
+}
+
++ (BOOL)resolveInstanceMethod:(SEL)selector {
+    NSString *selectorString = NSStringFromSelector(selector);
+    if ([selectorString hasPrefix:@"set"]) {
+        class_addMethod(self, selector, (IMP)autoDictionarySetter, "v@:@");
+    } else {
+        class_addMethod(self, selector, (IMP)autoDictionaryGetter, "@@:");
+    }
+    return YES;
+}
+
+@end
+
+id autoDictionaryGetter(id self, SEL _cmd) {
+    // Get the backing store from the object
+    EOCAutoDictionary *typedSelf = (EOCAutoDictionary*)self;
+    NSMutableDictionary *backingStore = typedSelf.backingStore;
+    
+    // The key is simply the selector name
+    NSString *key = NSStringFromSelector(_cmd);
+    
+    // Return the value
+    return [backingStore objectForKey:key];
+}
+
+void autoDictionarySetter(id self, SEL _cmd, id value) {
+    // Get the backing store from the object
+    EOCAutoDictionary *typedSelf = (EOCAutoDictionary*)self;
+    NSMutableDictionary *backingStore = typedSelf.backingStore;
+    
+    /** The selector will be for example, "setOpaqueObject:".
+     *  We need to remove the "set", ":" and lowercase the first
+     *  letter of the remainder.
+     */
+    NSString *selectorString = NSStringFromSelector(_cmd);
+    NSMutableString *key = [selectorString mutableCopy];
+    
+    // Remove the `:' at the end
+    [key deleteCharactersInRange:NSMakeRange(key.length - 1, 1)];
+    
+    // Remove the `set' prefix
+    [key deleteCharactersInRange:NSMakeRange(0, 3)];
+    
+    // Lowercase the first character
+    NSString *lowercaseFirstChar = [[key substringToIndex:1] lowercaseString];
+    [key replaceCharactersInRange:NSMakeRange(0, 1) withString:lowercaseFirstChar];
+    
+    if (value) {
+        [backingStore setObject:value forKey:key];
+    } else {
+        [backingStore removeObjectForKey:key];
+    }
+}
+
+// Using EOCAutoDictionary
+EOCAutoDictionary *dict = [EOCAutoDictionary new];
+dict.date = [NSDate dateWithTimeIntervalSince1970:475372800];
+NSLog(@"dict.date = %@", dict.date);
+// Output: dict.date = 1985-01-24 00:00:00 +0000
+
