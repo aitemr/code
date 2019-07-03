@@ -1,58 +1,43 @@
 // Item 13
 
-// Button delegate example
-@class Button;
-@protocol ButtonDelegate <NSObject>
-@optional
-- (void)buttonWasClicked:(Button*)button;
-- (void)buttonWasDoubleClicked:(Button*)button;
+Method originalMethod =
+    class_getInstanceMethod([NSString class],
+                            @selector(lowercaseString));
+Method swappedMethod =
+    class_getInstanceMethod([NSString class],
+                            @selector(uppercaseString));
+
+method_exchangeImplementations(originalMethod, swappedMethod);
+
+NSString *string = @"ThIs iS tHe StRiNg";
+NSString *lowercaseString = [string lowercaseString];
+NSLog(@"lowercaseString = %@", lowercaseString);
+// Output: lowercaseString = THIS IS THE STRING
+
+NSString *uppercaseString = [string uppercaseString];
+NSLog(@"uppercaseString = %@", uppercaseString);
+// Output: uppercaseString = this is the string
+
+@interface NSString (EOCMyAdditions)
+- (NSString*)eoc_myLowercaseString;
 @end
 
-@interface Button : NSObject
-@property (nonatomic, weak) id <ButtonDelegate> delegate;
-@end
+@implementation NSString (EOCMyAdditions)
+- (NSString*)eoc_myLowercaseString {
+    NSString *lowercase = [self eoc_myLowercaseString];
+    NSLog(@"%@ => %@", self, lowercase);
+    return lowercase;
+} @end
 
-@implementation Button
-...
-- (void)buttonWasClicked {
-    if ([_delegate respondsToSelector:@selector(buttonWasClicked:)]) {
-        [_delegate buttonWasClicked:self];
-    }
-    // Do button related things, e.g. change highlight color
-}
+Method originalMethod =
+    class_getInstanceMethod([NSString class],
+                            @selector(lowercaseString));
+Method swappedMethod =
+    class_getInstanceMethod([NSString class],
+                            @selector(eoc_myLowercaseString));
 
-- (void)buttonWasDoubleClicked {
-    if ([_delegate respondsToSelector:@selector(buttonWasDoubleClicked:)]) {
-        [_delegate buttonWasDoubleClicked:self];
-    }
-    // Do button related things, e.g. change highlight color
-}
-...
-@end
+method_exchangeImplementations(originalMethod, swappedMethod);
 
-
-// Inspecting class hierarchy
-NSMutableDictionary *dict = [NSMutableDictionary new];
-[dict isMemberOfClass:[NSDictionary class]]; ///< NO
-[dict isMemberOfClass:[NSMutableDictionary class]]; ///< YES
-[dict isKindOfClass:[NSDictionary class]]; ///< YES
-[dict isKindOfClass:[NSArray class]]; ///< NO
-
-
-// Example of using inspection of types
-- (NSString*)commaSeparatedStringFromObjects:(NSArray*)array {
-    NSMutableString *string = [NSMutableString new];
-    for (id object in array) {
-        if ([object isKindOfClass:[NSString class]]) {
-            [string appendFormat:@"%@,", object];
-        } else if ([object isKindOfClass:[NSNumber class]]) {
-            [string appendFormat:@"%d,", [object intValue]];
-        } else if ([object isKindOfClass:[NSData class]]) {
-            NSString *base64Encoded = /* base64 encode the data */;
-            [string appendFormat:@"%@,", base64Encoded];
-        } else {
-            // Type not supported
-        }
-    }
-    return string;
-}
+NSString *string = @"ThIs iS tHe StRiNg";
+NSString *lowercaseString = [string lowercaseString];
+// Ouput: ThIs iS tHe StRiNg => this is the string
