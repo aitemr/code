@@ -40,4 +40,4 @@ method_exchangeImplementations(originalMethod, swappedMethod);
 
 NSString *string = @"ThIs iS tHe StRiNg";
 NSString *lowercaseString = [string lowercaseString];
-// Ouput: ThIs iS tHe StRiNg => this is the string
+// Output: ThIs iS tHe StRiNg => this is the string
